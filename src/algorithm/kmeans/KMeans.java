@@ -1,203 +1,186 @@
 package algorithm.kmeans;
 
-import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.Map;
 
-public final class KMeans
-{
-	private KMeans () {}
-	
-	public static final Map<DataPoint, Integer> executeKMeans(double[][] data, int groups, double error)
-	{
-		LinkedList<DataPoint> dataPoints = formatData(data);
-		DataPoint[] prototypes = defineKPrototypes(data, groups);
-		
-		boolean[][] dataPointsGroups = actualKMeansExecution(dataPoints, prototypes, error);
-		
-		return DPGroupsToMap(dataPoints, dataPointsGroups);
+public final class KMeans {
+    private KMeans() {
+    }
+
+    public static final LinkedList<DataPoint> executeKMeans(final double[][] data, final int groups,
+	    final double error) {
+	final LinkedList<DataPoint> dataPoints = formatData(data);
+	final DataPoint[] prototypes = defineKPrototypes(data, groups);
+
+	final boolean[][] dataPointsGroups = actualKMeansExecution(dataPoints, prototypes, error, 0, error);
+
+	return addDPAndGroupsToLinkedList(dataPoints, dataPointsGroups);
+    }
+
+    private static final boolean[][] actualKMeansExecution(final LinkedList<DataPoint> dataPoints,
+	    DataPoint[] prototypes, final double error, int countErrors, final double lastError) {
+	final double[][] distanceOfDPToPrototypes = calculateDistanceDPtoPrototypes(dataPoints, prototypes);
+	final boolean[][] dataPointsGroups = defineDPtoGroup(distanceOfDPToPrototypes);
+
+	final double errorFunction = calculateErrorFunction(distanceOfDPToPrototypes, dataPointsGroups);
+	if ((errorFunction <= error) || (countErrors == 3)) {
+	    return dataPointsGroups;
+	}
+	if ((errorFunction >= (lastError - 0.5)) && (errorFunction <= (lastError + 0.5))) {
+	    countErrors++;
 	}
 
-	private static final boolean[][] actualKMeansExecution(LinkedList<DataPoint> dataPoints, DataPoint[] prototypes, double error)
-	{
-		double[][] distanceOfDPToPrototypes = calculateDistanceDPtoPrototypes(dataPoints, prototypes);
-		boolean[][] dataPointsGroups = defineDPtoGroup(distanceOfDPToPrototypes);
-		prototypes = updatePrototypesPosition(prototypes, dataPoints, dataPointsGroups);
-		
-		if (calculateErrorFunction(distanceOfDPToPrototypes, dataPointsGroups) <= error)
-		{
-			return dataPointsGroups;
+	prototypes = updatePrototypesPosition(prototypes, dataPoints, dataPointsGroups);
+
+	return actualKMeansExecution(dataPoints, prototypes, error, countErrors, errorFunction);
+    }
+
+    private static LinkedList<DataPoint> addDPAndGroupsToLinkedList(final LinkedList<DataPoint> dataPoints,
+	    final boolean[][] dataPointsGroups) {
+	final LinkedList<DataPoint> linkedListDP = new LinkedList<DataPoint>();
+
+	for (int i = 0; i < dataPoints.size(); i++) {
+	    for (int k = 0; k < dataPointsGroups.length; k++) {
+		if (dataPointsGroups[k][i] == true) {
+		    dataPoints.get(i).setGroup(k);
+		    linkedListDP.add(dataPoints.get(i));
 		}
-		
-		return actualKMeansExecution(dataPoints, prototypes, error);
+	    }
 	}
 
-	private static Map<DataPoint, Integer> DPGroupsToMap ( LinkedList<DataPoint> dataPoints, boolean[][] dataPointsGroups )
-	{
-		Map<DataPoint, Integer> mapDP = new HashMap<DataPoint, Integer>();
-		
-		for (int i = 0; i < dataPoints.size (); i++)
-		{
-			for (int k = 0; k < dataPointsGroups.length; k++)
-			{
-				if (dataPointsGroups[k][i] == true)
-					mapDP.put ( dataPoints.get ( i ), k );
-			}
+	return linkedListDP;
+    }
+
+    private static double calculateErrorFunction(final double[][] distDPToPrototype, final boolean[][] DPGroups) {
+	double error = 0.0;
+
+	for (int k = 0; k < distDPToPrototype.length; k++) {
+	    for (int i = 0; i < distDPToPrototype[0].length; i++) {
+		final int boolToInt = (DPGroups[k][i] == true) ? 1 : 0;
+		error += Math.pow(distDPToPrototype[k][i] * boolToInt, 2);
+	    }
+	}
+
+	return error;
+    }
+
+    private static double[][] calculateDistanceDPtoPrototypes(final LinkedList<DataPoint> dataPoints,
+	    final DataPoint[] prototypes) {
+	final double[][] distances = new double[prototypes.length][dataPoints.size()];
+
+	for (int i = 0; i < dataPoints.size(); i++) {
+	    final double[] properties = dataPoints.get(i).getProperties();
+
+	    for (int k = 0; k < prototypes.length; k++) {
+		double distance = 0.0;
+		final double[] prototypeProperties = prototypes[k].getProperties();
+
+		for (int h = 0; h < properties.length; h++) {
+		    distance += Math.pow((properties[h] - prototypeProperties[h]), 2);
 		}
-		
-		return mapDP;
+
+		distances[k][i] = Math.sqrt(distance);
+	    }
 	}
-	
-	private static double calculateErrorFunction (double[][] distDPToPrototype, boolean[][] DPGroups)
-	{
-		double error = 0.0;
-		
-		for (int k = 0; k < distDPToPrototype.length; k++)
-		{
-			for (int i = 0; i < distDPToPrototype[0].length; i++)
-			{
-				int boolToInt = (DPGroups[k][i] == true) ? 1 : 0;
-				error += Math.pow ( distDPToPrototype[k][i] * boolToInt, 2);
-			}
+
+	return distances;
+    }
+
+    private static DataPoint[] updatePrototypesPosition(final DataPoint[] prototypes,
+	    final LinkedList<DataPoint> dataPoints, final boolean[][] dataPointsGroups) {
+	final DataPoint[] newPrototypes = new DataPoint[prototypes.length];
+
+	for (int k = 0; k < prototypes.length; k++) {
+	    final double[] propertiesMeans = new double[dataPoints.get(0).getProperties().length];
+
+	    final double[][] tempProperties = new double[dataPoints.size()][propertiesMeans.length];
+
+	    for (int i = 0; i < tempProperties.length; i++) {
+		tempProperties[i] = dataPoints.get(i).getProperties();
+	    }
+
+	    for (int i = 0; i < propertiesMeans.length; i++) {
+		double distanceSum = 0;
+		int numberOfDP = 0;
+
+		for (int j = 0; j < dataPoints.size(); j++) {
+		    int boolToInt = 0;
+		    if (dataPointsGroups[k][j] == true) {
+			boolToInt = 1;
+			numberOfDP++;
+		    }
+
+		    distanceSum += (tempProperties[j][i] * boolToInt);
 		}
-		
-		return error;
+
+		propertiesMeans[i] = (distanceSum / numberOfDP);
+	    }
+
+	    newPrototypes[k] = new DataPoint(propertiesMeans);
 	}
 
-	private static double[][] calculateDistanceDPtoPrototypes ( LinkedList<DataPoint> dataPoints,
-			DataPoint[] prototypes )
-	{
-		double[][] distances = new double[prototypes.length][dataPoints.size ()];
-		
-		for (int i = 0; i < dataPoints.size (); i++)
-		{
-			double[] properties = dataPoints.get ( i ).getProperties ();
-			
-			for (int k = 0; k < prototypes.length; k++)
-			{
-				double distance = 0.0;
-				double[] prototypeProperties = prototypes[k].getProperties ();
-				
-				for (int h = 0; h < properties.length; h++)
-				{
-					distance += Math.pow ( (properties[h] - prototypeProperties[h]), 2 );
-				}
-			
-				distances[k][i] = Math.sqrt ( distance );
-			}
+	return newPrototypes;
+    }
+
+    private static boolean[][] defineDPtoGroup(final double[][] distances) {
+	final boolean[][] dataToPrototypes = new boolean[distances.length][distances[0].length];
+
+	for (int i = 0; i < distances[0].length; i++) {
+	    int group = 0;
+	    double minDistance = Double.MAX_VALUE;
+
+	    for (int k = 0; k < distances.length; k++) {
+		if (distances[k][i] < minDistance) {
+		    minDistance = distances[k][i];
+		    group = k;
 		}
-		
-		return distances;
+	    }
+
+	    dataToPrototypes[group][i] = true;
 	}
 
-	private static DataPoint[] updatePrototypesPosition ( DataPoint[] prototypes, LinkedList<DataPoint> dataPoints, boolean[][] dataPointsGroups )
-	{
-		DataPoint[] newPrototypes = new DataPoint[prototypes.length];
-		
-		for (int k = 0; k < prototypes.length; k++)
-		{
-			double[] propertiesMeans = new double[dataPoints.get ( 0 ).getProperties ().length];
+	return dataToPrototypes;
+    }
 
-			double[][] tempProperties = new double[dataPoints.size ()][propertiesMeans.length];
-			for (int i = 0 ; i < tempProperties.length; i++)
-			{
-				tempProperties[i] = dataPoints.get ( i ).getProperties ();
-			}
-			
-			for (int i = 0; i < propertiesMeans.length; i++)
-			{
-				double distanceSum = 0;
-				int numberOfDP = 0;
-				
-				for(int j = 0; j < dataPoints.size (); j++)
-				{
-					int boolToInt = 0;
-					if (dataPointsGroups[k][j] == true)
-					{
-						boolToInt = 1;
-						numberOfDP++;
-					}
-					
-					distanceSum += tempProperties[j][i] * boolToInt;
-				}
-				
-				propertiesMeans[i] = distanceSum / numberOfDP;
-			}
-			
-			newPrototypes[k] = new DataPoint(propertiesMeans);
+    private static DataPoint[] defineKPrototypes(final double[][] data, final int groups) {
+	if ((data.length == 0) || (data[0].length == 0)) {
+	    return null;
+	}
+
+	double auxMax, auxMin;
+	final double[][] range = new double[groups][data[0].length];
+	for (int i = 0; i < data[0].length; i++) {
+	    auxMax = Double.MIN_VALUE;
+	    auxMin = Double.MAX_VALUE;
+
+	    for (int j = 0; j < data.length; j++) {
+		if (data[j][i] > auxMax) {
+		    auxMax = data[j][i];
 		}
-		
-		return newPrototypes;
-	}
 
-	private static boolean[][] defineDPtoGroup ( double[][] distances )
-	{
-		boolean[][] dataToPrototypes = new boolean[distances.length][distances[0].length];
-
-		for (int i = 0; i < distances.length; i++)
-		{
-			int group = 0;
-			double minDistance = Double.MAX_VALUE;
-			
-			for(int k = 0; k < distances[0].length; k++)
-			{
-				if(distances[k][i] < minDistance)
-				{
-					group = k;
-				}
-			}
-			
-			dataToPrototypes[group][i] = true;
+		if (data[j][i] < auxMin) {
+		    auxMin = data[j][i];
 		}
-		
-		return dataToPrototypes;
+	    }
+
+	    for (int k = 0; k < groups; k++) {
+		range[k][i] = (Math.random() * (auxMax - auxMin)) + auxMin;
+	    }
 	}
 
-	private static DataPoint[] defineKPrototypes ( double[][] data, int groups )
-	{
-		if (data.length == 0 || data[0].length == 0) return null;
-		
-		double auxMax, auxMin;
-		double[][] range = new double[groups][data.length];
-		for (int i = 0; i < data[0].length; i++)
-		{	
-			auxMax = Double.MIN_VALUE;
-			auxMin = Double.MAX_VALUE;
-			for (double[] dataPoint : data)
-			{
-				if (dataPoint[i] > auxMax)
-				{
-					auxMax = dataPoint[i];
-				}
-				
-				if (dataPoint[i] < auxMin)
-				{
-					auxMin = dataPoint[i];
-				}
-			}
-			
-			for (int k = 0; k < groups; k++)
-			{
-				range[k][i] = Math.random () * auxMax + auxMin;
-			}
-		}
-		
-		DataPoint[] dataPoints = new DataPoint[groups];
-		for (int i = 0; i < groups; i++)
-		{
-			dataPoints[i] = new DataPoint(range[i]); 
-		}
-		
-		return dataPoints;
+	final DataPoint[] dataPoints = new DataPoint[groups];
+	for (int i = 0; i < groups; i++) {
+	    dataPoints[i] = new DataPoint(range[i]);
 	}
-	
 
-	private static LinkedList<DataPoint> formatData ( double[][] data )
-	{
-		LinkedList<DataPoint> dataList = new LinkedList<DataPoint>();
-		for(double[] dataPoint : data)
-			dataList.add ( new DataPoint(dataPoint) );
-		
-		return dataList;
+	return dataPoints;
+    }
+
+    private static LinkedList<DataPoint> formatData(final double[][] data) {
+	final LinkedList<DataPoint> dataList = new LinkedList<DataPoint>();
+	for (final double[] dataPoint : data) {
+	    dataList.add(new DataPoint(dataPoint));
 	}
+
+	return dataList;
+    }
 }
