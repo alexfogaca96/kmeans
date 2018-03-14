@@ -11,27 +11,73 @@ public final class KMeans {
 	final LinkedList<DataPoint> dataPoints = formatData(data);
 	final DataPoint[] prototypes = defineKPrototypes(data, groups);
 
-	final boolean[][] dataPointsGroups = actualKMeansExecution(dataPoints, prototypes, error, 0, error);
+	boolean[][] dataPointsGroups = actualKMeansExecution(dataPoints, prototypes, error);
+	while (groupsInDPGroupsIsNotValid(dataPointsGroups)) {
+	    final DataPoint[] newPrototypes = defineKPrototypes(data, groups);
+	    dataPointsGroups = actualKMeansExecution(dataPoints, newPrototypes, error);
+	}
 
 	return addDPAndGroupsToLinkedList(dataPoints, dataPointsGroups);
     }
 
+    private static boolean groupsInDPGroupsIsNotValid(final boolean[][] dataPointsGroups) {
+	for (int i = 0; i < dataPointsGroups.length; i++) {
+	    boolean elementPresence = false;
+	    for (int j = 0; j < dataPointsGroups[0].length; j++) {
+		if (dataPointsGroups[i][j]) {
+		    elementPresence = true;
+		}
+	    }
+
+	    if (!elementPresence) {
+		return true;
+	    }
+	}
+
+	return false;
+    }
+
+    private static final boolean runKMeansAgain(final double errorFunction, final int count, final double error) {
+	if (errorFunction <= error) {
+	    return false;
+	}
+
+	if (count >= 3) {
+	    return false;
+	}
+
+	return true;
+    }
+
     private static final boolean[][] actualKMeansExecution(final LinkedList<DataPoint> dataPoints,
-	    DataPoint[] prototypes, final double error, int countErrors, final double lastError) {
-	final double[][] distanceOfDPToPrototypes = calculateDistanceDPtoPrototypes(dataPoints, prototypes);
-	final boolean[][] dataPointsGroups = defineDPtoGroup(distanceOfDPToPrototypes);
+	    DataPoint[] prototypes, final double error) {
+	double[][] distanceOfDPToPrototypes = calculateDistanceDPtoPrototypes(dataPoints, prototypes);
+	boolean[][] dataPointsGroups = defineDPtoGroup(distanceOfDPToPrototypes);
+	double errorFunction = calculateErrorFunction(distanceOfDPToPrototypes, dataPointsGroups);
 
-	final double errorFunction = calculateErrorFunction(distanceOfDPToPrototypes, dataPointsGroups);
-	if ((errorFunction <= error) || (countErrors == 3)) {
-	    return dataPointsGroups;
+	double lastErrorFunction = 0;
+	int count = 0;
+	while (runKMeansAgain(errorFunction, count, error)) {
+	    prototypes = updatePrototypesPosition(prototypes, dataPoints, dataPointsGroups);
+	    distanceOfDPToPrototypes = calculateDistanceDPtoPrototypes(dataPoints, prototypes);
+	    dataPointsGroups = defineDPtoGroup(distanceOfDPToPrototypes);
+
+	    lastErrorFunction = errorFunction;
+	    errorFunction = calculateErrorFunction(distanceOfDPToPrototypes, dataPointsGroups);
+
+	    if (isNotThatDifferent(errorFunction, lastErrorFunction, error)) {
+		count++;
+		continue;
+	    }
 	}
-	if ((errorFunction >= (lastError - 0.5)) && (errorFunction <= (lastError + 0.5))) {
-	    countErrors++;
-	}
 
-	prototypes = updatePrototypesPosition(prototypes, dataPoints, dataPointsGroups);
+	return dataPointsGroups;
+    }
 
-	return actualKMeansExecution(dataPoints, prototypes, error, countErrors, errorFunction);
+    private static boolean isNotThatDifferent(final double errorFunction, final double lastErrorFunction,
+	    final double errorAccepted) {
+	return ((errorFunction >= (lastErrorFunction - (errorAccepted / 2)))
+		&& (errorFunction <= (lastErrorFunction + (errorAccepted / 2))));
     }
 
     private static LinkedList<DataPoint> addDPAndGroupsToLinkedList(final LinkedList<DataPoint> dataPoints,
@@ -56,7 +102,9 @@ public final class KMeans {
 	for (int k = 0; k < distDPToPrototype.length; k++) {
 	    for (int i = 0; i < distDPToPrototype[0].length; i++) {
 		final int boolToInt = (DPGroups[k][i] == true) ? 1 : 0;
-		error += Math.pow(distDPToPrototype[k][i] * boolToInt, 2);
+		if (boolToInt == 1) {
+		    error += Math.pow(distDPToPrototype[k][i] * boolToInt, 2);
+		}
 	    }
 	}
 

@@ -7,8 +7,15 @@ import algorithm.kmeans.KMeans;
 
 public class Main {
     public static void main(final String[] args) {
-	final double[][] data = new double[][] { { 3.0, 10.0 }, { 3.5, 10.5 }, { 10.0, 10.0 }, { 10.5, 10.5 },
-		{ 3.0, 3.0 }, { 3.5, 3.5 }, { 10.0, 3.0 }, { 10.5, 3.5 } };
+	final double[][] data = new double[][] {
+	     { 3.0, 10.0 },
+	     { 3.5, 10.5 },
+	    { 10.0, 10.0 },
+	    { 10.5, 10.5 },
+	     { 3.0, 3.0 },
+	     { 3.5, 3.5 },
+	    { 10.0, 3.0 },
+	    { 10.5, 3.5 } };
 
 	final int groups = 4;
 	final double error = 1.0;
